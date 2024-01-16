@@ -63,14 +63,14 @@ def my_normalize(data):
 
 def make_daslhs_dts(file_num, nsamples=None, range=(-1,1), save=False):
     # DTS
-    dts = pd.read_pickle('E:/Lytt-Fiber-Optics/dts_exp{}.pkl'.format(file_num))
+    dts = pd.read_pickle('dts_exp{}.pkl'.format(file_num))
     dts_norm = np.expand_dims(MinMaxScaler(range).fit_transform(dts.T),-1)
     # DAS
-    das = pd.read_pickle('E:/Lytt-Fiber-Optics/data_exp{}.pkl'.format(file_num))
+    das = pd.read_pickle('data_exp{}.pkl'.format(file_num))
     idx = np.sort(LatinHypercube(d=1).integers(l_bounds=0, u_bounds=das.shape[-1], n=dts.shape[1]).squeeze())
     das_lhs_norm = np.expand_dims(MinMaxScaler(range).fit_transform(das.iloc[:,idx].T),-1)
     if save:
-        pd.to_pickle(das_lhs_norm, 'E:/Lytt-Fiber-Optics/das{}_lhs.pkl'.format(file_num))
+        pd.to_pickle(das_lhs_norm, 'das{}_lhs.pkl'.format(file_num))
     return das_lhs_norm, dts_norm
 
 def plot_loss(fit, figsize=None):
