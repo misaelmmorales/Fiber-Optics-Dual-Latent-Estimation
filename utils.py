@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import tensorflow as tf
+from matplotlib.gridspec import GridSpec
+
 
 import h5py                                           #import h5 files
 import os                                             #OS operations
@@ -21,6 +22,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.tree import DecisionTreeRegressor
 
+import tensorflow as tf
 import keras
 import keras.backend as K
 from keras import Model
@@ -45,6 +47,7 @@ def check_tf():
     print('# GPU available:', len(tf.config.experimental.list_physical_devices('GPU')))
     print("CUDA: {} | cuDNN: {}".format(sys_info["cuda_version"], sys_info["cudnn_version"]))
     print(tf.config.list_physical_devices())
+    return None
 
 def make_sparse_flowrates(flow, injection_idx):
     flowrates = np.zeros((200,4))
@@ -83,6 +86,7 @@ def plot_loss(fit, figsize=None):
     plt.title('Training: Loss vs epochs'); plt.legend()
     plt.xlabel('Epochs'); plt.ylabel('Loss')
     plt.xticks(iterations[::epochs//10])
+    return None
 
 def plot_relative_rates(data, cmap='Blues'):
     ylab = ['BG', 'Inj1', 'Inj2', 'Inj3', 'Inj4']
@@ -100,6 +104,7 @@ def plot_relative_rates(data, cmap='Blues'):
                         0.02, axs[-1].get_position().y1-axs[-1].get_position().y0])
     plt.colorbar(im, cax=cax, label='relative rates')
     plt.show() 
+    return None
 
 def plot_relative_mat(data, cmap='Blues'):
     labels = ['Oil','Gas','Water','Sand']
@@ -115,6 +120,7 @@ def plot_relative_mat(data, cmap='Blues'):
                         0.02, axs[-1].get_position().y1-axs[-1].get_position().y0])
     plt.colorbar(im, cax=cax, label='relative rates')
     plt.show()
+    return None
 
 def plot_das_dts_flow(das, dts, flow, figsize=(25,6), expnum=''):
     plt.figure(figsize=figsize, facecolor='white')
@@ -129,6 +135,7 @@ def plot_das_dts_flow(das, dts, flow, figsize=(25,6), expnum=''):
     plt.xticks([0,1,2,3], labels=['oil','water','gas','sand'])
     plt.title('Normalized Injection Rates & Points - Experiment {}'.format(expnum))
     plt.show()
+    return None
 
 def plot_latent(zdata, figsize=None, cmap='binary', vmin=0, vmax=1, title='Latent'):
     if figsize:
@@ -137,6 +144,7 @@ def plot_latent(zdata, figsize=None, cmap='binary', vmin=0, vmax=1, title='Laten
                aspect='auto', cmap=cmap, vmin=vmin, vmax=vmax)
     plt.title(title); plt.xlabel('pseudo-Timestep'); plt.ylabel('pseudo-Distance')
     plt.colorbar()
+    return None
 
 def plot_featuremaps(data, nrows, ncols, expnum='', cmap='afmhot', figsize=(20,6), vmin=None, vmax=None):
     k = 0
@@ -148,6 +156,7 @@ def plot_featuremaps(data, nrows, ncols, expnum='', cmap='afmhot', figsize=(20,6
             k += 1
     plt.suptitle('Experiment {} Feature Maps'.format(expnum))
     plt.show()
+    return None
 
 def plot_true_pred_z(true, pred, latent, figsize=(30,6), filenum='', cmaps=['seismic','seismic'], vmin=-0.1, vmax=0.1):
     plt.figure(figsize=figsize, facecolor='white')
@@ -163,6 +172,7 @@ def plot_true_pred_z(true, pred, latent, figsize=(30,6), filenum='', cmaps=['sei
     plt.subplot(144)
     plot_latent(latent, title='Experiment {} Latent Space'.format(filenum))
     plt.show()
+    return None
 
 def plot_rates_true_pred(true, pred, expnum='', figsize=(20,5), vmin=0, vmax=1, cmaps=['turbo', 'gist_heat_r']):
     ticks, labels = [0,1,2,3], ['oil','water','gas','sand']
@@ -180,6 +190,7 @@ def plot_rates_true_pred(true, pred, expnum='', figsize=(20,5), vmin=0, vmax=1, 
     plt.title('Absolute Difference - Exp {}'.format(expnum))
     plt.xticks(ticks, labels=labels); plt.ylabel('distance'); plt.colorbar()
     plt.show()
+    return None
 
 ###############################################################################################
 def mse_ssim_loss(y_true, y_pred, alpha=0.8):
@@ -309,7 +320,7 @@ def make_flowpred_from_dual_latent(zdas, zdts, flow, expnum='',
     flow_pred_f = reg.predict(z_dual)
     flow_pred   = np.reshape(flow_pred_f, flow.shape)
     print('MSE:  {:.2e}'.format(mean_squared_error(flow, flow_pred_f)))
-    print('SSIM: {:.3f}'.format(image_ssim(flow, flow_pred, win_size=ssim_window)))
+    print('SSIM: {:.3f}'.format(image_ssim(flow, flow_pred, win_size=ssim_window, data_range=1.0)))
     if plot:
         titles = ['True Relative Rates - Exp {}'.format(expnum), 
                   'Predicted Relative Rates - Exp {}'.format(expnum)]
@@ -324,7 +335,7 @@ def make_flowpred_from_dual_latent(zdas, zdts, flow, expnum='',
             k += 1
     return reg
 
-def transfer_learning_predictions(newdas, newdts, newflow, dasm2z, dtsm2z, expnum, 
+def transfer_learning_predictions_dual(newdas, newdts, newflow, dasm2z, dtsm2z, expnum, 
                                   method=LinearRegression(), ssim_window=3, 
                                   plot=True, figsize=(10,4), cmap='gist_heat_r'):
     newdas_z = dasm2z.predict(newdas).squeeze().astype('float64')
@@ -334,3 +345,93 @@ def transfer_learning_predictions(newdas, newdts, newflow, dasm2z, dtsm2z, expnu
                                    expnum=expnum, method=method, 
                                    ssim_window=ssim_window, plot=plot, 
                                    figsize=figsize, cmap=cmap)
+    return None
+
+############### Single Latent Spaces ###############
+def make_single_latents(das_m2z, dts_m2z, all_data):
+    das45, das48, das54, das64, das109, das128 = all_data['das']
+    dts45, dts48, dts54, dts64, dts109, dts128 = all_data['dts']
+
+    das45_z = das_m2z.predict(das45, verbose=0).squeeze().astype('float64')
+    das48_z = das_m2z.predict(das48, verbose=0).squeeze().astype('float64')
+    das54_z = das_m2z.predict(das54, verbose=0).squeeze().astype('float64')
+    das64_z = das_m2z.predict(das64, verbose=0).squeeze().astype('float64')
+    das109_z = das_m2z.predict(das109, verbose=0).squeeze().astype('float64')
+    das128_z = das_m2z.predict(das128, verbose=0).squeeze().astype('float64')
+    print('DAS Latent Spaces: \n'+'-'*57)
+    print('45: {} | 48: {}   | 54: {}'.format(das45_z.shape, das48_z.shape, das54_z.shape))
+    print('64: {} | 109: {} | 128: {}'.format(das64_z.shape, das109_z.shape, das128_z.shape))
+    print('-'*57)
+
+    dts45_z = dts_m2z.predict(dts45, verbose=0).squeeze().astype('float64')
+    dts48_z = dts_m2z.predict(dts48, verbose=0).squeeze().astype('float64')
+    dts54_z = dts_m2z.predict(dts54, verbose=0).squeeze().astype('float64')
+    dts64_z = dts_m2z.predict(dts64, verbose=0).squeeze().astype('float64')
+    dts109_z = dts_m2z.predict(dts109, verbose=0).squeeze().astype('float64')
+    dts128_z = dts_m2z.predict(dts128, verbose=0).squeeze().astype('float64')
+    print('\nDTS Latent Spaces: \n'+'-'*57)
+    print('45: {} | 48: {}   | 54: {}'.format(dts45_z.shape, dts48_z.shape, dts54_z.shape))
+    print('64: {} | 109: {} | 128: {}'.format(dts64_z.shape, dts109_z.shape, dts128_z.shape))
+    print('-'*57)
+
+    dasz = {'45':das45_z, '48':das48_z, '54':das54_z, '64':das64_z, '109':das109_z, '128':das128_z}
+    dtsz = {'45':dts45_z, '48':dts48_z, '54':dts54_z, '64':dts64_z, '109':dts109_z, '128':dts128_z}
+    return {'das':dasz, 'dts':dtsz}
+
+def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='',
+                                     method=LinearRegression(), ssim_window=3,
+                                     plot=True, figsize=(14, 7.5), cmap='gist_heat_r', cmap2='binary'):
+    flow = flow[expnum]
+
+    zdas = latents['das'][expnum].flatten().reshape(200,-1)
+    regdas = method
+    regdas.fit(zdas,flow)
+    flow_pred_f_das = regdas.predict(zdas)
+    flow_pred_das   = np.reshape(flow_pred_f_das, flow.shape)
+    flow_err_das = np.abs(flow-flow_pred_das)
+    print('DAS only: MSE={:.2e}, SSIM={:.3f}'.format(mean_squared_error(flow, flow_pred_f_das),
+                                                     image_ssim(flow, flow_pred_das, win_size=ssim_window, data_range=1.0)))
+
+    zdts = latents['dts'][expnum].flatten().reshape(200,-1)
+    regdts = method
+    regdts.fit(zdts,flow)
+    flow_pred_f_dts = regdts.predict(zdts)
+    flow_pred_dts   = np.reshape(flow_pred_f_dts, flow.shape)
+    flow_err_dts = np.abs(flow-flow_pred_dts)
+    print('DTS only: MSE={:.2e}, SSIM={:.3f}'.format(mean_squared_error(flow, flow_pred_f_dts),
+                                                     image_ssim(flow, flow_pred_dts, win_size=ssim_window, data_range=1.0)))
+
+    zdual = np.concatenate([zdas, zdts]).flatten().reshape(200,-1)
+    regdual = method
+    regdual.fit(zdual,flow)
+    flow_pred_f = regdual.predict(zdual)
+    flow_pred   = np.reshape(flow_pred_f, flow.shape)
+    flow_err = np.abs(flow-flow_pred)
+    print('Dual:     MSE={:.2e}, SSIM={:.3f}'.format(mean_squared_error(flow, flow_pred_f),
+                                                     image_ssim(flow, flow_pred, win_size=ssim_window, data_range=1.0)))
+
+    if plot:
+        title = ['True Relative Rates - Exp {}'.format(expnum),
+                 'Predicted Relative Rates - DAS'.format(expnum),
+                 'Predicted Relative Rates - DTS'.format(expnum),
+                 'Predicted Relative Rates - Dual'.format(expnum),
+                 'Relative Error - DAS'.format(expnum),
+                 'Relative Error - DTS'.format(expnum),
+                 'Relative Error - Dual'.format(expnum)]
+        xlabels = ['Oil','Gas','Water','Sand']
+        data = [flow, flow_pred_das, flow_pred_dts, flow_pred, flow_err_das, flow_err_dts, flow_err]
+        fig = plt.figure(figsize=figsize)
+        gs = GridSpec(2, 4, figure=fig)
+        ax1 = fig.add_subplot(gs[:, 0])
+        ax2 = fig.add_subplot(gs[0, 1]); ax3 = fig.add_subplot(gs[0, 2]); ax4 = fig.add_subplot(gs[0, 3])
+        ax5 = fig.add_subplot(gs[1, 1]); ax6 = fig.add_subplot(gs[1, 2]); ax7 = fig.add_subplot(gs[1, 3])
+        axs = [ax1, ax2, ax3, ax4, ax5, ax6, ax7]
+        for k, ax in enumerate(axs):
+            im = ax.imshow(data[k], cmap=cmap, aspect='auto')
+            ax.set_title(title[k]); ax.set_xticks(np.arange(4)); ax.set_xticklabels(xlabels)
+            ax.set_ylabel('Distance [m]') if k==0 else None
+            im.set_cmap(cmap2) if k >= 4 else None
+            im.set_clim(0, 1) if k < 4 else im.set_clim(0, 0.005)
+            plt.colorbar(im, ax=ax)
+        plt.tight_layout(); plt.show()
+    return None
