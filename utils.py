@@ -113,6 +113,7 @@ def plot_relative_mat(data, cmap='Blues'):
     for i in range(6):
         im = axs[i].matshow(data[i], cmap=cmap, aspect=0.03)
         axs[i].set(title=exp_titles[i], xticks=np.arange(4), xticklabels=labels)
+        axs[i].xaxis.set_ticks_position('bottom')
     for k in range(1,6):
         axs[k].set(yticks=[])
     axs[0].set(ylabel='Distance [m]')
