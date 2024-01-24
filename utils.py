@@ -348,9 +348,12 @@ def transfer_learning_predictions_dual(newdas, newdts, newflow, dasm2z, dtsm2z, 
     return None
 
 ############### Single Latent Spaces ###############
-def make_single_latents(das_m2z, dts_m2z, all_data):
-    das45, das48, das54, das64, das109, das128 = all_data['das']
-    dts45, dts48, dts54, dts64, dts109, dts128 = all_data['dts']
+def make_single_latents(models, data):
+    das45, das48, das54, das64, das109, das128 = data['das'].values()
+    dts45, dts48, dts54, dts64, dts109, dts128 = data['dts'].values()
+
+    das_m2m, das_m2z = models['das']['m2m'], models['das']['m2z']
+    dts_m2m, dts_m2z = models['dts']['m2m'], models['dts']['m2z']
 
     das45_z = das_m2z.predict(das45, verbose=0).squeeze().astype('float64')
     das48_z = das_m2z.predict(das48, verbose=0).squeeze().astype('float64')
@@ -433,5 +436,61 @@ def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='',
             im.set_cmap(cmap2) if k >= 4 else None
             im.set_clim(0, 1) if k < 4 else im.set_clim(0, 0.005)
             plt.colorbar(im, ax=ax)
+        plt.tight_layout(); plt.show()
+    return None
+
+def make_uq_pred_dual(expnum:str, all_data:dict, models:dict, flow_dict:dict, noise_lvl:list=[5, 10, 25, 50], 
+                      method = LinearRegression(), ssim_window=3,
+                      plot:bool=True, figsize=(15,7.5),
+                      cmap='gist_heat_r', cmap2='binary'):
+    flow  = flow_dict[expnum]
+    das   = all_data['das'][expnum]
+    dts   = all_data['dts'][expnum]
+    noise = np.random.normal(0, 1, das.shape)
+    if plot:
+        fig = plt.figure(figsize=(15,7.5))
+        gs = GridSpec(3, 5, height_ratios=[1, 1, .01])
+        xlabels = ['Oil','Gas','Water','Sand']
+        ax0 = fig.add_subplot(gs[:-1, 0])
+        im0 = ax0.imshow(flow, aspect='auto', cmap=cmap)
+        ax0.set(xticks=np.arange(4), xticklabels=xlabels, ylabel='Distance [m]')
+        ax0.set_title('True Relative Rates - Exp {}'.format(expnum), weight='bold')
+        plt.colorbar(im0)
+        ax11 = fig.add_subplot(gs[0, 1])
+        ax12 = fig.add_subplot(gs[0, 2])
+        ax13 = fig.add_subplot(gs[0, 3])
+        ax14 = fig.add_subplot(gs[0, 4])
+        top_axs = [ax11, ax12, ax13, ax14]
+        ax21 = fig.add_subplot(gs[1, 1])
+        ax22 = fig.add_subplot(gs[1, 2])
+        ax23 = fig.add_subplot(gs[1, 3])
+        ax24 = fig.add_subplot(gs[1, 4])
+        bot_axs = [ax21, ax22, ax23, ax24]
+        ax31 = fig.add_subplot(gs[2, 1])
+        ax32 = fig.add_subplot(gs[2, 2])
+        ax33 = fig.add_subplot(gs[2, 3])
+        ax34 = fig.add_subplot(gs[2, 4])
+        txt_axs = [ax31, ax32, ax33, ax34]
+        for i in range(4):
+            das_n = das + noise * noise_lvl[i]*das.std()
+            dts_n = dts + noise * noise_lvl[i]*dts.std()
+            z_das = models['das']['m2z'].predict(das_n, verbose=0).squeeze().astype('float64')
+            z_dts = models['dts']['m2z'].predict(dts_n, verbose=0).squeeze().astype('float64')
+            z_dual = np.concatenate([z_das, z_dts]).flatten().reshape(200,-1)
+            reg = method
+            reg.fit(z_dual, flow)
+            flow_pred_f = reg.predict(z_dual)
+            flow_pred   = np.reshape(flow_pred_f, flow.shape)
+            err = np.abs(flow-flow_pred)
+            mse = image_mse(flow, flow_pred)
+            ssim = image_ssim(flow, flow_pred, win_size=ssim_window, data_range=1.0)
+            im1 = top_axs[i].imshow(flow_pred, aspect='auto', cmap=cmap, vmin=0, vmax=1)
+            top_axs[i].set(xticks=np.arange(4), xticklabels=xlabels, title='Prediction - {:.0f}% Noise'.format(noise_lvl[i]))
+            im2 = bot_axs[i].imshow(err, aspect='auto', cmap=cmap2, vmin=0, vmax=6e-15)
+            bot_axs[i].set(xticks=np.arange(4), xticklabels=xlabels, title='Absolute Error')
+            plt.colorbar(im1); plt.colorbar(im2)
+            im3 = txt_axs[i].text(0.5, 0.5, 'MSE:  {:.2e}\nSSIM: {:.3f}'.format(mse, ssim), 
+                                  ha='center', va='center', transform=txt_axs[i].transAxes)
+            txt_axs[i].axis('off')
         plt.tight_layout(); plt.show()
     return None
