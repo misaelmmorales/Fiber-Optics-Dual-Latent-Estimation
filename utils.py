@@ -450,12 +450,12 @@ def make_uq_pred_dual(expnum:str, all_data:dict, models:dict, flow_dict:dict, no
     noise = np.random.normal(0, 1, das.shape)
     if plot:
         fig = plt.figure(figsize=(15,7.5))
-        gs = GridSpec(3, 5, height_ratios=[1, 1, .01])
+        gs = GridSpec(3, 5, height_ratios=[1, 1, .0001])
         xlabels = ['Oil','Gas','Water','Sand']
         ax0 = fig.add_subplot(gs[:-1, 0])
         im0 = ax0.imshow(flow, aspect='auto', cmap=cmap)
         ax0.set(xticks=np.arange(4), xticklabels=xlabels, ylabel='Distance [m]')
-        ax0.set_title('True Relative Rates - Exp {}'.format(expnum), weight='bold')
+        ax0.set_title('Trial {}'.format(expnum), weight='bold')
         plt.colorbar(im0)
         ax11 = fig.add_subplot(gs[0, 1])
         ax12 = fig.add_subplot(gs[0, 2])
@@ -490,8 +490,7 @@ def make_uq_pred_dual(expnum:str, all_data:dict, models:dict, flow_dict:dict, no
             im2 = bot_axs[i].imshow(err, aspect='auto', cmap=cmap2, vmin=0, vmax=6e-15)
             bot_axs[i].set(xticks=np.arange(4), xticklabels=xlabels, title='Absolute Error')
             plt.colorbar(im1); plt.colorbar(im2)
-            im3 = txt_axs[i].text(0.5, 0.5, 'MSE:  {:.2e}\nSSIM: {:.3f}'.format(mse, ssim), 
-                                  ha='center', va='center', transform=txt_axs[i].transAxes)
+            #im3 = txt_axs[i].text(0.5, 0.5, 'MSE:  {:.2e}\nSSIM: {:.3f}'.format(mse, ssim), ha='center', va='center', transform=txt_axs[i].transAxes)
             txt_axs[i].axis('off')
         plt.tight_layout(); plt.show()
     return None
