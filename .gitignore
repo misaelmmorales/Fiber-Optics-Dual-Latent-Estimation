@@ -1,6 +1,12 @@
 data/*
-paper/*
+
 FE_Consortium_Presentations/*
+
 initial_sample_data_and_test_matrix/*
+
 old_models/z_test_dual.npy
 old_models/z_train_dual.npy
+
+paper/*.docx
+paper/*.pdf
+paper/*.zip
