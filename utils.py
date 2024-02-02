@@ -449,7 +449,7 @@ def make_uq_pred_dual(expnum:str, all_data:dict, models:dict, flow_dict:dict, no
     dts   = all_data['dts'][expnum]
     noise = np.random.normal(0, 1, das.shape)
     if plot:
-        fig = plt.figure(figsize=(15,7.5))
+        fig = plt.figure(figsize=figsize)
         gs = GridSpec(3, 5, height_ratios=[1, 1, .0001])
         xlabels = ['Oil','Gas','Water','Sand']
         ax0 = fig.add_subplot(gs[:-1, 0])
@@ -494,3 +494,64 @@ def make_uq_pred_dual(expnum:str, all_data:dict, models:dict, flow_dict:dict, no
             txt_axs[i].axis('off')
         plt.tight_layout(); plt.show()
     return None
+
+
+### OLD FUNCTIONS ###
+# Open raw DAS/DTS files and save as pandas pickles
+# crop fiber data into 200m segment, corresponding to the length of the flow-loop [4950, 5150]
+
+# def read_save_dts_data(folder, save_name, size=200):
+#     print('This is Experiment {}. Saved.'.format(folder[-2:]))
+#     ### folder1 == 'E:/Research/Lytt Fiber Optics/DTS Experiment 54' ###
+#     ### folder2 == 'E:/Research/Lytt Fiber Optics/DTS Experiment 64' ###
+#     # save depth datums
+#     dts_depths = pd.read_csv(os.path.join(folder, os.listdir(folder)[0]), usecols=[1]).squeeze()[-size:]
+#     dts_depths.to_pickle('dts_depthstamps.pkl')
+#     # save timestamps
+#     dts_timestamps = pd.Series(dtype='object')
+#     for i in range(len(os.listdir(folder))):
+#         dts_timestamps.loc[i] = pd.to_datetime(os.listdir(folder)[i][9:19], format="%H%M%S%f").time()
+#     if folder[-2:]=='54':
+#         dts_timestamps.to_pickle('dts_exp54_timestamps.pkl')    
+#     elif folder[-2:]=='64':
+#         dts_timestamps.to_pickle('dts_exp64_timestamps.pkl')
+#     # save temperature data
+#     all_files  = os.listdir(folder)
+#     dts_df = pd.DataFrame(())
+#     for i in range(len(all_files)):
+#         my_file = os.listdir(folder)[i]
+#         file_path = os.path.join(folder, my_file)
+#         new_dts   = pd.read_csv(file_path, usecols=[2])
+#         dts_df = pd.concat([dts_df, new_dts], ignore_index=True, axis=1)
+#     dts_postprocess = dts_df.iloc[-size:]
+#     dts_postprocess.to_pickle(save_name)
+
+# # Function to open H5 file as Pandas DataFrame
+# def open_fiber_H5_2_arr(folder_n=1, file_n=0, xstart=4950, xend=5150):
+#     if folder_n==1:
+#         fold = 'E:/Lytt Fiber Optics/Sintef3mH5'
+#     elif folder_n==2:
+#         fold = 'E:/Lytt Fiber Optics/Sintef10mH5'
+#     elif folder_n==45:
+#         fold = 'E:/Lytt Fiber Optics/45'
+#     elif folder_n==48:
+#         fold = 'E:/Lytt Fiber Optics/48'
+#     elif folder_n==109:
+#         fold = 'E:/Lytt Fiber Optics/109'
+#     elif folder_n==128:
+#         fold = 'E:/Lytt Fiber Optics/128'
+#     file = os.listdir(fold)
+#     file_path = os.path.join(fold, file[file_n])
+#     f = h5py.File(file_path, 'r')
+#     df = pd.DataFrame((f['Acquisition']['Raw[0]']['RawData'])).iloc[:, xstart:xend].T
+#     f.close
+#     return df
+
+# # change folder_i, files_i to desired experiment
+# folder128 = 'E:/Lytt Fiber Optics/128'
+# print('Experiment 128 (file128) # of files: {}'.format(len(os.listdir(folder128))))
+# data_exp128 = pd.DataFrame(())
+# for i in range(len(os.listdir(folder128))):
+#     new_data1 = open_fiber_H5_2_arr(folder_n=128, file_n=i, xstart=4950, xend=5150)
+#     data_exp128 = pd.concat([data_exp128, new_data1], ignore_index=True, axis=1)
+#     data_exp128.to_pickle('E:/Lytt Fiber Optics/data_exp128.pkl')
