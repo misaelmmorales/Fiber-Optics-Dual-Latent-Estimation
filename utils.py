@@ -384,9 +384,8 @@ def make_single_latents(models, data):
 
 def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='',
                                      method=LinearRegression(), ssim_window=3,
-                                     plot=True, figsize=(14, 7.5), cmap='gist_heat_r', cmap2='binary'):
+                                     plot=True, figsize=(12, 7), cmap='gist_heat_r', cmap2='binary'):
     flow = flow[expnum]
-
     zdas = latents['das'][expnum].flatten().reshape(200,-1)
     regdas = method
     regdas.fit(zdas,flow)
@@ -415,28 +414,44 @@ def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='',
                                                      image_ssim(flow, flow_pred, win_size=ssim_window, data_range=1.0)))
 
     if plot:
-        title = ['True Relative Rates - Exp {}'.format(expnum),
-                 'Predicted Relative Rates - DAS'.format(expnum),
-                 'Predicted Relative Rates - DTS'.format(expnum),
-                 'Predicted Relative Rates - Dual'.format(expnum),
-                 'Relative Error - DAS'.format(expnum),
-                 'Relative Error - DTS'.format(expnum),
-                 'Relative Error - Dual'.format(expnum)]
         xlabels = ['Oil','Gas','Water','Sand']
-        data = [flow, flow_pred_das, flow_pred_dts, flow_pred, flow_err_das, flow_err_dts, flow_err]
+        pred = [flow_pred_das, flow_pred_dts, flow_pred]
+        err  = [flow_err_das, flow_err_dts, flow_err]
         fig = plt.figure(figsize=figsize)
-        gs = GridSpec(2, 4, figure=fig)
+        gs = GridSpec(2, 5, figure=fig, width_ratios=[0.75, 1, 1, 1, 0.1])
         ax1 = fig.add_subplot(gs[:, 0])
         ax2 = fig.add_subplot(gs[0, 1]); ax3 = fig.add_subplot(gs[0, 2]); ax4 = fig.add_subplot(gs[0, 3])
         ax5 = fig.add_subplot(gs[1, 1]); ax6 = fig.add_subplot(gs[1, 2]); ax7 = fig.add_subplot(gs[1, 3])
+        cax1 = fig.add_subplot(gs[:1, 4])
+        cax2 = fig.add_subplot(gs[1:, 4])
         axs = [ax1, ax2, ax3, ax4, ax5, ax6, ax7]
-        for k, ax in enumerate(axs):
-            im = ax.imshow(data[k], cmap=cmap, aspect='auto')
-            ax.set_title(title[k]); ax.set_xticks(np.arange(4)); ax.set_xticklabels(xlabels)
-            ax.set_ylabel('Distance [m]') if k==0 else None
-            im.set_cmap(cmap2) if k >= 4 else None
-            im.set_clim(0, 1) if k < 4 else im.set_clim(0, 0.005)
-            plt.colorbar(im, ax=ax)
+        ax1.imshow(flow, cmap=cmap, aspect='auto', interpolation='none')
+        for k, ax in enumerate([ax2, ax3, ax4]):
+            im1 = ax.imshow(pred[k], cmap='gist_heat_r', aspect='auto', interpolation='none', vmin=0, vmax=1)
+        cb1 = plt.colorbar(im1, cax=cax1)
+        for k, ax in enumerate([ax5, ax6, ax7]):
+            im2 = ax.imshow(err[k], cmap='binary', aspect='auto', interpolation='none', vmin=0, vmax=5e-3)
+        cb2 = plt.colorbar(im2, cax=cax2)
+        for ax in [ax2, ax3, ax4]:
+            ax.set_xticks([])
+        for ax in [ax3, ax4, ax6, ax7]:
+            ax.set_yticks([])
+        for ax in axs:
+            ax.set_ylim(0,200)
+            ax.invert_yaxis()
+            ax.vlines(range(4), 0, 200, color='k', ls='--', alpha=0.25)
+        for ax in [ax1, ax5, ax6, ax7]:
+            ax.set_xticks(range(4))
+            ax.set_xticklabels(xlabels, weight='bold')
+        for ax in [ax1, ax2, ax5]:
+            ax.set_ylabel('Distance [m]')
+        ax2.set_title('DAS only', weight='bold')
+        ax3.set_title('DTS only', weight='bold')
+        ax4.set_title('Dual', weight='bold')
+        ax1.set_title('True Relative Rates', weight='bold')
+        ax41 = ax4.twinx(); ax41.set_yticks([]); ax41.set_ylabel('Predicted Relative Rates', weight='bold', labelpad=20, rotation=270, fontsize=12)
+        ax71 = ax7.twinx(); ax71.set_yticks([]); ax71.set_ylabel('Absolute Error', weight='bold', labelpad=20, rotation=270, fontsize=12)
+        plt.suptitle('Experiment {}'.format(expnum), fontsize=16, weight='bold')
         plt.tight_layout(); plt.show()
     return None
 
