@@ -28,14 +28,11 @@ import keras.backend as K
 from keras import Model
 from keras import regularizers
 from keras.layers import Input
+from keras.layers import Dense, Conv1D, Conv1DTranspose
 from keras.layers import LeakyReLU, PReLU
-from keras.layers import Dropout, Flatten, Reshape, Concatenate, TimeDistributed, Concatenate
-from keras.layers import Dense
-from keras.layers import Conv1D, Conv1DTranspose
-from keras.layers import MaxPooling1D, UpSampling1D, BatchNormalization
+from keras.layers import Dropout, Flatten, Reshape, Concatenate, TimeDistributed
+from keras.layers import MaxPooling1D, UpSampling1D, BatchNormalization, LayerNormalization
 from keras.optimizers import Adam, Nadam
-from tensorflow_addons.layers import InstanceNormalization
-from keras.layers import LayerNormalization
 from tensorflow import expand_dims
 
 # Define arguments for text box in PLT.TEXT()
@@ -204,7 +201,7 @@ def mse_mae_loss(y_true, y_pred, alpha=0.5):
     mae = tf.keras.losses.MeanAbsoluteError()
     return alpha*mse(y_true,y_pred) + (1-alpha)*mae(y_true,y_pred)
 
-def das_Unet(act=LeakyReLU(alpha=0.3)):
+def das_Unet(act=LeakyReLU(negative_slope=0.3)):
     image = tf.keras.Input((200,1), name='input')
     # downlayer 1
     conv1 = Conv1D(4, 3, activation=act, padding='same')(image)
@@ -258,7 +255,7 @@ def das_Unet(act=LeakyReLU(alpha=0.3)):
     das_m2z = Model(inputs=[image], outputs=[latent])
     return das_m2m, das_m2z
 
-def dts_Unet(act=LeakyReLU(alpha=0.3)):
+def dts_Unet(act=LeakyReLU(negative_slope=0.3)):
     image = tf.keras.Input((200,1), name='input')
     # downlayer 1
     conv1 = Conv1D(4, 3, activation=act, padding='same')(image)
