@@ -6,3 +6,7 @@ initial_sample_data_and_test_matrix/*
 
 old_models/z_test_dual.npy
 old_models/z_train_dual.npy
+UTAHFORGE/Utah Forge 16B(78)-32 - strain change - smf 2 - evo 0.h5
+UTAHFORGE/Utah Forge 16B(78)-32 - strain change - smf 2 - evo 1.h5
+UTAHFORGE/Utah Forge 16B(78)-32 - strain change rate - smf 2 - evo 0.h5
+UTAHFORGE/Utah Forge 16B(78)-32 - strain change rate - smf 2 - evo 1.h5
