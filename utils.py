@@ -3,10 +3,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
-
 import h5py                                           #import h5 files
 import os                                             #OS operations
 import time                                           #timing and clock time
+import datetime                                       #date and time
 import scipy.signal as signal                         #signal processing
 from scipy.io import loadmat                          #load MatLab m-files
 from scipy.stats.qmc import LatinHypercube            #Latin Hypercube sampling
@@ -22,6 +22,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.tree import DecisionTreeRegressor
 
+import torch
 import tensorflow as tf
 import keras
 import keras.backend as K
@@ -35,15 +36,32 @@ from keras.layers import MaxPooling1D, UpSampling1D, BatchNormalization, LayerNo
 from keras.optimizers import Adam, Nadam
 from tensorflow import expand_dims
 
-# Define arguments for text box in PLT.TEXT()
 my_box = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+K.clear_session()
 
 def check_tf():
-    sys_info = tf.sysconfig.get_build_info()
-    print('Tensorflow built with CUDA?',  tf.test.is_built_with_cuda())
-    print('# GPU available:', len(tf.config.experimental.list_physical_devices('GPU')))
-    print("CUDA: {} | cuDNN: {}".format(sys_info["cuda_version"], sys_info["cudnn_version"]))
-    print(tf.config.list_physical_devices())
+    sys_info, cuda_avail = tf.sysconfig.get_build_info(), tf.test.is_built_with_cuda()
+    devices = tf.config.experimental.list_physical_devices('GPU')
+    count, details = len(devices), tf.config.experimental.get_device_details(devices[0])
+    cudnn_v = details['compute_capability']
+    print('\n'+'-'*60)
+    print('----------------------- VERSION INFO -----------------------')
+    print('TensorFlow version: {} | TF Built with CUDA? {}'.format(tf.__version__, cuda_avail))
+    print('# Device(s) available: {} | CUDA: {} | cuDNN: {}.{}'.format(count, sys_info['cuda_version'], cudnn_v[0], cudnn_v[1]))
+    print('Name(s): {}'.format(details['device_name']))
+    print('-'*60+'\n')
+    return None
+
+def check_torch():
+    torch_version, cuda_avail = torch.__version__, torch.cuda.is_available()
+    cuda_v, cudnn_v = torch.version.cuda, torch.backends.cudnn.version()
+    count, name = torch.cuda.device_count(), torch.cuda.get_device_name()
+    print('\n'+'-'*60)
+    print('----------------------- VERSION INFO -----------------------')
+    print('Torch version: {} | Torch Built with CUDA? {}'.format(torch_version, cuda_avail))
+    print('# Device(s) available: {} | CUDA: {} | cuDNN: {}.{} '.format(count,cuda_v,cudnn_v//1000,(cudnn_v%1000)/100))
+    print('Name(s): {}'.format(name))
+    print('-'*60+'\n')
     return None
 
 def make_sparse_flowrates(flow, injection_idx):
@@ -201,7 +219,7 @@ def mse_mae_loss(y_true, y_pred, alpha=0.5):
     mae = tf.keras.losses.MeanAbsoluteError()
     return alpha*mse(y_true,y_pred) + (1-alpha)*mae(y_true,y_pred)
 
-def das_Unet(act=LeakyReLU(negative_slope=0.3)):
+def das_Unet(act=LeakyReLU(alpha=0.3)):
     image = tf.keras.Input((200,1), name='input')
     # downlayer 1
     conv1 = Conv1D(4, 3, activation=act, padding='same')(image)
@@ -255,7 +273,7 @@ def das_Unet(act=LeakyReLU(negative_slope=0.3)):
     das_m2z = Model(inputs=[image], outputs=[latent])
     return das_m2m, das_m2z
 
-def dts_Unet(act=LeakyReLU(negative_slope=0.3)):
+def dts_Unet(act=LeakyReLU(alpha=0.3)):
     image = tf.keras.Input((200,1), name='input')
     # downlayer 1
     conv1 = Conv1D(4, 3, activation=act, padding='same')(image)
