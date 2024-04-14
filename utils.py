@@ -22,7 +22,6 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.tree import DecisionTreeRegressor
 
-import torch
 import tensorflow as tf
 import keras
 import keras.backend as K
@@ -53,6 +52,7 @@ def check_tf():
     return None
 
 def check_torch():
+    import torch
     torch_version, cuda_avail = torch.__version__, torch.cuda.is_available()
     cuda_v, cudnn_v = torch.version.cuda, torch.backends.cudnn.version()
     count, name = torch.cuda.device_count(), torch.cuda.get_device_name()
@@ -219,8 +219,8 @@ def mse_mae_loss(y_true, y_pred, alpha=0.5):
     mae = tf.keras.losses.MeanAbsoluteError()
     return alpha*mse(y_true,y_pred) + (1-alpha)*mae(y_true,y_pred)
 
-def das_Unet(act=LeakyReLU(alpha=0.3)):
-    image = tf.keras.Input((200,1), name='input')
+def das_Unet(xsteps=200, act=LeakyReLU(alpha=0.3)):
+    image = tf.keras.Input((xsteps,1), name='input')
     # downlayer 1
     conv1 = Conv1D(4, 3, activation=act, padding='same')(image)
     conv1 = BatchNormalization()(conv1)
@@ -273,8 +273,8 @@ def das_Unet(act=LeakyReLU(alpha=0.3)):
     das_m2z = Model(inputs=[image], outputs=[latent])
     return das_m2m, das_m2z
 
-def dts_Unet(act=LeakyReLU(alpha=0.3)):
-    image = tf.keras.Input((200,1), name='input')
+def dts_Unet(xsteps=200, act=LeakyReLU(alpha=0.3)):
+    image = tf.keras.Input((xsteps,1), name='input')
     # downlayer 1
     conv1 = Conv1D(4, 3, activation=act, padding='same')(image)
     conv1 = BatchNormalization()(conv1)
@@ -327,10 +327,10 @@ def dts_Unet(act=LeakyReLU(alpha=0.3)):
     dts_m2z = Model(image, latent)
     return dts_m2m, dts_m2z
 
-def make_flowpred_from_dual_latent(zdas, zdts, flow, expnum='', 
+def make_flowpred_from_dual_latent(zdas, zdts, flow, xsteps=200, expnum='', 
                                    method=LinearRegression(), ssim_window=3, 
-                                   plot=True, figsize=(10,4), cmap='gist_heat_r'):
-    z_dual = np.concatenate([zdas, zdts]).flatten().reshape(200,-1)
+                                   plot=True, figsize=(10,4), cmaps=['gist_heat_r','hot_r']):
+    z_dual = np.concatenate([zdas, zdts]).flatten().reshape(xsteps,-1)
     reg = method
     reg.fit(z_dual, flow)
     flow_pred_f = reg.predict(z_dual)
@@ -339,69 +339,73 @@ def make_flowpred_from_dual_latent(zdas, zdts, flow, expnum='',
     print('SSIM: {:.3f}'.format(image_ssim(flow, flow_pred, win_size=ssim_window, data_range=1.0)))
     if plot:
         titles = ['True Relative Rates - Exp {}'.format(expnum), 
-                  'Predicted Relative Rates - Exp {}'.format(expnum)]
+                  'Predicted Relative Rates - Exp {}'.format(expnum),
+                  'Percent Error - Exp {}'.format(expnum)]
         xlabels = ['Oil','Gas','Water','Sand']
-        plt.figure(figsize=figsize)
-        k = 0
-        for i in [flow, flow_pred]:
-            plt.subplot(1,2,k+1)
-            plt.imshow(i, aspect='auto', cmap=cmap)
-            plt.colorbar(label='relative rates'); plt.clim(0,1)
-            plt.title(titles[k]); plt.xticks(np.arange(4), labels=xlabels)
-            k += 1
+        err = np.abs(np.divide((flow_pred-flow), np.where(flow==0.,np.nan,flow)))*100
+        fig, axs = plt.subplots(1, 3, figsize=figsize)
+        im0 = axs[0].imshow(flow, aspect='auto', cmap=cmaps[0], vmin=0, vmax=1)
+        im1 = axs[1].imshow(flow_pred, aspect='auto', cmap=cmaps[0], vmin=0, vmax=1)
+        im2 = axs[2].imshow(err, aspect='auto', cmap=cmaps[1])
+        plt.colorbar(im0, ax=axs[0]); plt.colorbar(im1, ax=axs[1]); plt.colorbar(im2, ax=axs[2])
+        for i in range(3):
+            axs[i].set(title=titles[i], xticks=np.arange(4), xticklabels=xlabels, ylim=(xsteps,0))
+            axs[i].vlines([np.arange(4)+0.5], 0, xsteps, color='k', ls='--', alpha=0.2)
+        plt.tight_layout()
+        plt.show()
     return reg
 
-def transfer_learning_predictions_dual(newdas, newdts, newflow, dasm2z, dtsm2z, expnum, 
-                                  method=LinearRegression(), ssim_window=3, 
-                                  plot=True, figsize=(10,4), cmap='gist_heat_r'):
-    newdas_z = dasm2z.predict(newdas).squeeze().astype('float64')
-    newdts_z = dtsm2z.predict(newdts).squeeze().astype('float64')
+def transfer_learning_predictions_dual(newdas, newdts, newflow, dasm2z, dtsm2z, expnum,
+                                  xsteps=200, method=LinearRegression(), ssim_window=3, 
+                                  plot=True, figsize=(10,4), cmaps=['gist_heat_r','hot_r']):
+    newdas_z = dasm2z.predict(newdas, verbose=0).squeeze().astype('float64')
+    newdts_z = dtsm2z.predict(newdts, verbose=0).squeeze().astype('float64')
     print('Shapes - z_DAS: {} | z_DTS: {}'.format(newdas_z.shape, newdts_z.shape))
     make_flowpred_from_dual_latent(newdas_z, newdts_z, newflow, 
-                                   expnum=expnum, method=method, 
+                                   xsteps=xsteps, expnum=expnum, method=method, 
                                    ssim_window=ssim_window, plot=plot, 
-                                   figsize=figsize, cmap=cmap)
+                                   figsize=figsize, cmaps=cmaps)
     return None
 
 ############### Single Latent Spaces ###############
-def make_single_latents(models, data):
-    das45, das48, das54, das64, das109, das128 = data['das'].values()
-    dts45, dts48, dts54, dts64, dts109, dts128 = data['dts'].values()
+def make_single_latents(models, data, keys=['45','48','54','64','109','128']):
+    das1, das2, das3, das4, das5, das6 = data['das'].values()
+    dts1, dts2, dts3, dts4, dts5, dts6 = data['dts'].values()
 
     das_m2m, das_m2z = models['das']['m2m'], models['das']['m2z']
     dts_m2m, dts_m2z = models['dts']['m2m'], models['dts']['m2z']
 
-    das45_z = das_m2z.predict(das45, verbose=0).squeeze().astype('float64')
-    das48_z = das_m2z.predict(das48, verbose=0).squeeze().astype('float64')
-    das54_z = das_m2z.predict(das54, verbose=0).squeeze().astype('float64')
-    das64_z = das_m2z.predict(das64, verbose=0).squeeze().astype('float64')
-    das109_z = das_m2z.predict(das109, verbose=0).squeeze().astype('float64')
-    das128_z = das_m2z.predict(das128, verbose=0).squeeze().astype('float64')
+    das1_z = das_m2z.predict(das1, verbose=0).squeeze().astype('float64')
+    das2_z = das_m2z.predict(das2, verbose=0).squeeze().astype('float64')
+    das3_z = das_m2z.predict(das3, verbose=0).squeeze().astype('float64')
+    das4_z = das_m2z.predict(das4, verbose=0).squeeze().astype('float64')
+    das5_z = das_m2z.predict(das5, verbose=0).squeeze().astype('float64')
+    das6_z = das_m2z.predict(das6, verbose=0).squeeze().astype('float64')
     print('DAS Latent Spaces: \n'+'-'*57)
-    print('45: {} | 48: {}   | 54: {}'.format(das45_z.shape, das48_z.shape, das54_z.shape))
-    print('64: {} | 109: {} | 128: {}'.format(das64_z.shape, das109_z.shape, das128_z.shape))
+    print('{}: {} | {}: {}   | {}: {}'.format(keys[0], das1_z.shape, keys[1], das2_z.shape, keys[2], das3_z.shape))
+    print('{}: {} | {}: {} | {}: {}'.format(keys[3], das4_z.shape, keys[4], das5_z.shape, keys[5], das6_z.shape))
     print('-'*57)
 
-    dts45_z = dts_m2z.predict(dts45, verbose=0).squeeze().astype('float64')
-    dts48_z = dts_m2z.predict(dts48, verbose=0).squeeze().astype('float64')
-    dts54_z = dts_m2z.predict(dts54, verbose=0).squeeze().astype('float64')
-    dts64_z = dts_m2z.predict(dts64, verbose=0).squeeze().astype('float64')
-    dts109_z = dts_m2z.predict(dts109, verbose=0).squeeze().astype('float64')
-    dts128_z = dts_m2z.predict(dts128, verbose=0).squeeze().astype('float64')
+    dts1_z = dts_m2z.predict(dts1, verbose=0).squeeze().astype('float64')
+    dts2_z = dts_m2z.predict(dts2, verbose=0).squeeze().astype('float64')
+    dts3_z = dts_m2z.predict(dts3, verbose=0).squeeze().astype('float64')
+    dts4_z = dts_m2z.predict(dts4, verbose=0).squeeze().astype('float64')
+    dts5_z = dts_m2z.predict(dts5, verbose=0).squeeze().astype('float64')
+    dts6_z = dts_m2z.predict(dts6, verbose=0).squeeze().astype('float64')
     print('\nDTS Latent Spaces: \n'+'-'*57)
-    print('45: {} | 48: {}   | 54: {}'.format(dts45_z.shape, dts48_z.shape, dts54_z.shape))
-    print('64: {} | 109: {} | 128: {}'.format(dts64_z.shape, dts109_z.shape, dts128_z.shape))
+    print('{}: {} | {}: {}   | {}: {}'.format(keys[0], dts1_z.shape, keys[1], dts2_z.shape, keys[2], dts3_z.shape))
+    print('{}: {} | {}: {} | {}: {}'.format(keys[3], dts4_z.shape, keys[4], dts5_z.shape, keys[5], dts6_z.shape))
     print('-'*57)
 
     dasz = {'45':das45_z, '48':das48_z, '54':das54_z, '64':das64_z, '109':das109_z, '128':das128_z}
     dtsz = {'45':dts45_z, '48':dts48_z, '54':dts54_z, '64':dts64_z, '109':dts109_z, '128':dts128_z}
     return {'das':dasz, 'dts':dtsz}
 
-def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='',
+def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='', xsteps=200,
                                      method=LinearRegression(), ssim_window=3,
-                                     plot=True, figsize=(12, 7), cmap='gist_heat_r', cmap2='binary'):
+                                     plot=True, figsize=(12, 7), cmaps=['gist_heat_r','binary']):
     flow = flow[expnum]
-    zdas = latents['das'][expnum].flatten().reshape(200,-1)
+    zdas = latents['das'][expnum].flatten().reshape(xsteps,-1)
     regdas = method
     regdas.fit(zdas,flow)
     flow_pred_f_das = regdas.predict(zdas)
@@ -410,7 +414,7 @@ def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='',
     print('DAS only: MSE={:.2e}, SSIM={:.3f}'.format(mean_squared_error(flow, flow_pred_f_das),
                                                      image_ssim(flow, flow_pred_das, win_size=ssim_window, data_range=1.0)))
 
-    zdts = latents['dts'][expnum].flatten().reshape(200,-1)
+    zdts = latents['dts'][expnum].flatten().reshape(xsteps,-1)
     regdts = method
     regdts.fit(zdts,flow)
     flow_pred_f_dts = regdts.predict(zdts)
@@ -419,7 +423,7 @@ def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='',
     print('DTS only: MSE={:.2e}, SSIM={:.3f}'.format(mean_squared_error(flow, flow_pred_f_dts),
                                                      image_ssim(flow, flow_pred_dts, win_size=ssim_window, data_range=1.0)))
 
-    zdual = np.concatenate([zdas, zdts]).flatten().reshape(200,-1)
+    zdual = np.concatenate([zdas, zdts]).flatten().reshape(xsteps,-1)
     regdual = method
     regdual.fit(zdual,flow)
     flow_pred_f = regdual.predict(zdual)
@@ -440,21 +444,21 @@ def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='',
         cax1 = fig.add_subplot(gs[:1, 4])
         cax2 = fig.add_subplot(gs[1:, 4])
         axs = [ax1, ax2, ax3, ax4, ax5, ax6, ax7]
-        ax1.imshow(flow, cmap=cmap, aspect='auto', interpolation='none')
+        ax1.imshow(flow, cmap=cmap[0], aspect='auto', interpolation='none')
         for k, ax in enumerate([ax2, ax3, ax4]):
-            im1 = ax.imshow(pred[k], cmap='gist_heat_r', aspect='auto', interpolation='none', vmin=0, vmax=1)
+            im1 = ax.imshow(pred[k], cmap=cmaps[0], aspect='auto', interpolation='none', vmin=0, vmax=1)
         cb1 = plt.colorbar(im1, cax=cax1)
         for k, ax in enumerate([ax5, ax6, ax7]):
-            im2 = ax.imshow(err[k], cmap='binary', aspect='auto', interpolation='none', vmin=0, vmax=5e-3)
+            im2 = ax.imshow(err[k], cmap=cmaps[1], aspect='auto', interpolation='none', vmin=0, vmax=5e-3)
         cb2 = plt.colorbar(im2, cax=cax2)
         for ax in [ax2, ax3, ax4]:
             ax.set_xticks([])
         for ax in [ax3, ax4, ax6, ax7]:
             ax.set_yticks([])
         for ax in axs:
-            ax.set_ylim(0,200)
+            ax.set_ylim(0,xsteps)
             ax.invert_yaxis()
-            ax.vlines(range(4), 0, 200, color='k', ls='--', alpha=0.25)
+            ax.vlines(range(4), 0, xsteps, color='k', ls='--', alpha=0.25)
         for ax in [ax1, ax5, ax6, ax7]:
             ax.set_xticks(range(4))
             ax.set_xticklabels(xlabels, weight='bold')
