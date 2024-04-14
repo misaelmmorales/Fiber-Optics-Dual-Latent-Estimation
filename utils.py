@@ -397,8 +397,8 @@ def make_single_latents(models, data, keys=['45','48','54','64','109','128']):
     print('{}: {} | {}: {} | {}: {}'.format(keys[3], dts4_z.shape, keys[4], dts5_z.shape, keys[5], dts6_z.shape))
     print('-'*57)
 
-    dasz = {'45':das45_z, '48':das48_z, '54':das54_z, '64':das64_z, '109':das109_z, '128':das128_z}
-    dtsz = {'45':dts45_z, '48':dts48_z, '54':dts54_z, '64':dts64_z, '109':dts109_z, '128':dts128_z}
+    dasz = dict(zip(keys, [das1_z, das2_z, das3_z, das4_z, das5_z, das6_z]))
+    dtsz = dict(zip(keys, [dts1_z, dts2_z, dts3_z, dts4_z, dts5_z, dts6_z]))
     return {'das':dasz, 'dts':dtsz}
 
 def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='', xsteps=200,
@@ -431,43 +431,45 @@ def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='', xst
     flow_err = np.abs(flow-flow_pred)
     print('Dual:     MSE={:.2e}, SSIM={:.3f}'.format(mean_squared_error(flow, flow_pred_f),
                                                      image_ssim(flow, flow_pred, win_size=ssim_window, data_range=1.0)))
-
+    maxerr = np.max([np.max(flow_err_das), np.max(flow_err_dts), np.max(flow_err)])
     if plot:
         xlabels = ['Oil','Gas','Water','Sand']
         pred = [flow_pred_das, flow_pred_dts, flow_pred]
         err  = [flow_err_das, flow_err_dts, flow_err]
         fig = plt.figure(figsize=figsize)
         gs = GridSpec(2, 5, figure=fig, width_ratios=[0.75, 1, 1, 1, 0.1])
-        ax1 = fig.add_subplot(gs[:, 0])
+        ax1a = fig.add_subplot(gs[0, 0])
+        ax1b = fig.add_subplot(gs[1, 0])
         ax2 = fig.add_subplot(gs[0, 1]); ax3 = fig.add_subplot(gs[0, 2]); ax4 = fig.add_subplot(gs[0, 3])
         ax5 = fig.add_subplot(gs[1, 1]); ax6 = fig.add_subplot(gs[1, 2]); ax7 = fig.add_subplot(gs[1, 3])
         cax1 = fig.add_subplot(gs[:1, 4])
         cax2 = fig.add_subplot(gs[1:, 4])
-        axs = [ax1, ax2, ax3, ax4, ax5, ax6, ax7]
-        ax1.imshow(flow, cmap=cmap[0], aspect='auto', interpolation='none')
+        axs = [ax1a, ax1b, ax2, ax3, ax4, ax5, ax6, ax7]
+        ax1a.imshow(flow, cmap=cmaps[0], aspect='auto', interpolation='none')
+        ax1b.imshow(flow, cmap=cmaps[0], aspect='auto', interpolation='none')
         for k, ax in enumerate([ax2, ax3, ax4]):
             im1 = ax.imshow(pred[k], cmap=cmaps[0], aspect='auto', interpolation='none', vmin=0, vmax=1)
         cb1 = plt.colorbar(im1, cax=cax1)
         for k, ax in enumerate([ax5, ax6, ax7]):
-            im2 = ax.imshow(err[k], cmap=cmaps[1], aspect='auto', interpolation='none', vmin=0, vmax=5e-3)
+            im2 = ax.imshow(err[k], cmap=cmaps[1], aspect='auto', interpolation='none', vmin=0, vmax=maxerr)
         cb2 = plt.colorbar(im2, cax=cax2)
-        for ax in [ax2, ax3, ax4]:
+        for ax in [ax1a, ax2, ax3, ax4]:
             ax.set_xticks([])
-        for ax in [ax3, ax4, ax6, ax7]:
-            ax.set_yticks([])
+        for ax in [ax2, ax3, ax4, ax5, ax6, ax7]:
+            ax.set_yticklabels([])
         for ax in axs:
             ax.set_ylim(0,xsteps)
             ax.invert_yaxis()
-            ax.vlines(range(4), 0, xsteps, color='k', ls='--', alpha=0.25)
-        for ax in [ax1, ax5, ax6, ax7]:
+            ax.vlines(np.arange(4)+0.5, 0, xsteps, color='k', ls='--', alpha=0.25)
+        for ax in [ax1b, ax5, ax6, ax7]:
             ax.set_xticks(range(4))
             ax.set_xticklabels(xlabels, weight='bold')
-        for ax in [ax1, ax2, ax5]:
+        for ax in [ax1a, ax1b]:
             ax.set_ylabel('Distance [m]')
         ax2.set_title('DAS only', weight='bold')
         ax3.set_title('DTS only', weight='bold')
         ax4.set_title('Dual', weight='bold')
-        ax1.set_title('True Relative Rates', weight='bold')
+        ax1a.set_title('True Relative Rates', weight='bold')
         ax41 = ax4.twinx(); ax41.set_yticks([]); ax41.set_ylabel('Predicted Relative Rates', weight='bold', labelpad=20, rotation=270, fontsize=12)
         ax71 = ax7.twinx(); ax71.set_yticks([]); ax71.set_ylabel('Absolute Error', weight='bold', labelpad=20, rotation=270, fontsize=12)
         plt.suptitle('Experiment {}'.format(expnum), fontsize=16, weight='bold')
@@ -475,7 +477,7 @@ def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='', xst
     return None
 
 def make_uq_pred_dual(expnum:str, all_data:dict, models:dict, flow_dict:dict, noise_lvl:list=[5, 10, 25, 50], 
-                      method = LinearRegression(), ssim_window=3,
+                      xsteps=200, method = LinearRegression(), ssim_window=3,
                       plot:bool=True, figsize=(15,7.5),
                       cmap='gist_heat_r', cmap2='binary'):
     flow  = flow_dict[expnum]
@@ -489,7 +491,7 @@ def make_uq_pred_dual(expnum:str, all_data:dict, models:dict, flow_dict:dict, no
         ax0 = fig.add_subplot(gs[:-1, 0])
         im0 = ax0.imshow(flow, aspect='auto', cmap=cmap)
         ax0.set(xticks=np.arange(4), xticklabels=xlabels, ylabel='Distance [m]')
-        ax0.set_title('Trial {}'.format(expnum), weight='bold')
+        ax0.set_title('Exp {}'.format(expnum), weight='bold')
         plt.colorbar(im0)
         ax11 = fig.add_subplot(gs[0, 1])
         ax12 = fig.add_subplot(gs[0, 2])
@@ -506,12 +508,15 @@ def make_uq_pred_dual(expnum:str, all_data:dict, models:dict, flow_dict:dict, no
         ax33 = fig.add_subplot(gs[2, 3])
         ax34 = fig.add_subplot(gs[2, 4])
         txt_axs = [ax31, ax32, ax33, ax34]
+        for ax in [ax0]+top_axs+bot_axs:
+            ax.vlines(np.arange(3)+0.5, 0, xsteps, color='k', ls='--', alpha=0.2)
+            ax.set(ylim=(xsteps,0))
         for i in range(4):
             das_n = das + noise * noise_lvl[i]*das.std()
             dts_n = dts + noise * noise_lvl[i]*dts.std()
             z_das = models['das']['m2z'].predict(das_n, verbose=0).squeeze().astype('float64')
             z_dts = models['dts']['m2z'].predict(dts_n, verbose=0).squeeze().astype('float64')
-            z_dual = np.concatenate([z_das, z_dts]).flatten().reshape(200,-1)
+            z_dual = np.concatenate([z_das, z_dts]).flatten().reshape(xsteps,-1)
             reg = method
             reg.fit(z_dual, flow)
             flow_pred_f = reg.predict(z_dual)
@@ -528,7 +533,6 @@ def make_uq_pred_dual(expnum:str, all_data:dict, models:dict, flow_dict:dict, no
             txt_axs[i].axis('off')
         plt.tight_layout(); plt.show()
     return None
-
 
 ### OLD FUNCTIONS ###
 # Open raw DAS/DTS files and save as pandas pickles
