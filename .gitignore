@@ -6,9 +6,8 @@ initial_sample_data_and_test_matrix/*
 
 old_models/z_test_dual.npy
 old_models/z_train_dual.npy
-test_simplified/das_dts.npz
-test_simplified/flow_params.npz
-tests_field/Utah Forge 16B(78)-32 - strain change - smf 2 - evo 0.h5
-tests_field/Utah Forge 16B(78)-32 - strain change - smf 2 - evo 1.h5
-tests_field/Utah Forge 16B(78)-32 - strain change rate - smf 2 - evo 0.h5
-tests_field/Utah Forge 16B(78)-32 - strain change rate - smf 2 - evo 1.h5
+
+field_case/Utah Forge 16B(78)-32 - strain change - smf 2 - evo 0.h5
+field_case/Utah Forge 16B(78)-32 - strain change - smf 2 - evo 1.h5
+field_case/Utah Forge 16B(78)-32 - strain change rate - smf 2 - evo 0.h5
+field_case/Utah Forge 16B(78)-32 - strain change rate - smf 2 - evo 1.h5
