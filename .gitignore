@@ -1,9 +1,7 @@
 data/*
 old_models/*
 
-paper_GJI/*
-paper_geophysics/*
-paper_GeoEn/*
+paper_*/*
 
 FE_Consortium_Presentations/*
 initial_sample_data_and_test_matrix/*
