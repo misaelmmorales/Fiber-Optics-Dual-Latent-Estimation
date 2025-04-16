@@ -402,14 +402,14 @@ def make_single_latents(models, data, keys=['45','48','54','64','109','128']):
     return {'das':dasz, 'dts':dtsz}
 
 def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='', xsteps=200,
-                                     method=LinearRegression(), ssim_window=3,
+                                     method=LinearRegression(), ssim_window=3, return_data:bool=True,
                                      plot=True, figsize=(12, 7), cmaps=['gist_heat_r','binary']):
     flow = flow[expnum]
     zdas = latents['das'][expnum].flatten().reshape(xsteps,-1)
     regdas = method
     regdas.fit(zdas,flow)
     flow_pred_f_das = regdas.predict(zdas)
-    flow_pred_das   = np.reshape(flow_pred_f_das, flow.shape)
+    flow_pred_das = np.reshape(flow_pred_f_das, flow.shape)
     flow_err_das = np.abs(flow-flow_pred_das)
     print('DAS only: MSE={:.2e}, SSIM={:.3f}'.format(mean_squared_error(flow, flow_pred_f_das),
                                                      image_ssim(flow, flow_pred_das, win_size=ssim_window, data_range=1.0)))
@@ -418,7 +418,7 @@ def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='', xst
     regdts = method
     regdts.fit(zdts,flow)
     flow_pred_f_dts = regdts.predict(zdts)
-    flow_pred_dts   = np.reshape(flow_pred_f_dts, flow.shape)
+    flow_pred_dts = np.reshape(flow_pred_f_dts, flow.shape)
     flow_err_dts = np.abs(flow-flow_pred_dts)
     print('DTS only: MSE={:.2e}, SSIM={:.3f}'.format(mean_squared_error(flow, flow_pred_f_dts),
                                                      image_ssim(flow, flow_pred_dts, win_size=ssim_window, data_range=1.0)))
@@ -427,7 +427,7 @@ def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='', xst
     regdual = method
     regdual.fit(zdual,flow)
     flow_pred_f = regdual.predict(zdual)
-    flow_pred   = np.reshape(flow_pred_f, flow.shape)
+    flow_pred = np.reshape(flow_pred_f, flow.shape)
     flow_err = np.abs(flow-flow_pred)
     print('Dual:     MSE={:.2e}, SSIM={:.3f}'.format(mean_squared_error(flow, flow_pred_f),
                                                      image_ssim(flow, flow_pred, win_size=ssim_window, data_range=1.0)))
@@ -474,7 +474,10 @@ def make_flowpred_from_single_latent(latents:dict, flow:dict, expnum:str='', xst
         ax71 = ax7.twinx(); ax71.set_yticks([]); ax71.set_ylabel('Absolute Error', weight='bold', labelpad=20, rotation=270, fontsize=12)
         plt.suptitle('Experiment {}'.format(expnum), fontsize=16, weight='bold')
         plt.tight_layout(); plt.show()
-    return None
+    if return_data:
+        return {'das':flow_pred_das, 'dts':flow_pred_dts, 'dual':flow_pred}
+    else:
+        return None
 
 def make_uq_pred_dual(expnum:str, all_data:dict, models:dict, flow_dict:dict, noise_lvl:list=[5, 10, 25, 50], 
                       xsteps=200, method = LinearRegression(), ssim_window=3,
